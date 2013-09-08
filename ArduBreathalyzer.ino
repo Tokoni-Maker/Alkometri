@@ -19,6 +19,8 @@ char* post_modes[] = {"All", "Facebook", "Twitter", "None"};
 
 String lat = String("");
 String lon = String("");
+String url = String("");
+String apn = String("");
 
 int lcd_key     = 0;
 int adc_key_in  = 0;
@@ -179,9 +181,13 @@ int8_t ATcommand(char* command, unsigned int timeout,
 bool initGPRS() {
 
     while (ATcommand("AT+CREG?", 2000, "+CREG: 0,1", "+CREG: 0,5") == 0);
+    
+    String command = String("AT+SAPBR=3,1,\"APN\",\""+apn+"\"")
+    char charBuf[command.length()+1];
+    command.toCharArray(charBuf, command.length()+1);
 
     ATcommand("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\"", 2000, "OK");
-    ATcommand("AT+SAPBR=3,1,\"APN\",\"internet\"", 2000, "OK");
+    ATcommand(charBuf, 2000, "OK");
 
     while (ATcommand("AT+SAPBR=1,1",  20000, "OK") == 0)
     {
@@ -194,7 +200,7 @@ bool initGPRS() {
 void sendBACData(String service, String bac) {
 
     // create string
-    String uri = String("http://relativity.fi:5050/api/"+user+"/"+token+"/"+bac+"/"+service+"/"+lat+"/"+lon);
+    String uri = String(url+"/api/"+user+"/"+token+"/"+bac+"/"+service+"/"+lat+"/"+lon);
 
     answer = ATcommand("AT+HTTPINIT", 10000, "OK");
 
