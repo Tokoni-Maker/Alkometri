@@ -320,7 +320,7 @@ void stopGPS()
 // this function calculates very unreliable bac value
 // you have to test and calibrate your sensor by yourself:
 // humidity and temperature affects a lot to the readings
-// and this is based partly to the amount of the drinks that have been drank
+// and this is based partly to the amount of the drinks which have been drank
 double calculate_bac(int raw_value) {
 
     // how much one drink affects
@@ -466,9 +466,9 @@ void loop()
 
                 // waits for fix GPS
                 while((ATcommand("AT+CGPSSTATUS?", 5000, "Location 2D Fix", "Location 3D Fix") == 0 ) &&
-                      ((millis() - previous) < 10000));
+                      ((millis() - previous) < 300000));
 
-                if ((millis() - previous) < 10000)
+                if ((millis() - previous) < 300000)
                 {
                     fix = true;
                 }
