@@ -6,6 +6,8 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 // set these according to the ArduBreathalyzerAPI
 String user = String("");
 String token = String("");
+String url = String("");
+String apn = String("");
 
 int gps = 0;
 int post_mode = 0;
@@ -13,14 +15,20 @@ int8_t answer;
 int x = 0;
 bool first_run = true;
 bool fix = false;
+// initial value of the sensor
+int start_value = 0;
+// one drink value
+int one_drink = 0;
+// how many drinks
+int count = 0;
+// multiplier for bac calculation
+double multiplier = 1.0;
 
 char* GPS_modes[] = {"OFF", "ON"};
 char* post_modes[] = {"All", "Facebook", "Twitter", "None"};
 
 String lat = String("");
 String lon = String("");
-String url = String("");
-String apn = String("");
 
 int lcd_key     = 0;
 int adc_key_in  = 0;
@@ -36,7 +44,7 @@ int read_LCD_buttons() {
 
     adc_key_in = analogRead(0);
 
-    if (adc_key_in < 100)   return btnRIGHT;
+    if (adc_key_in < 100)  return btnRIGHT;
     if (adc_key_in < 250)  return btnUP;
     if (adc_key_in < 450)  return btnDOWN;
     if (adc_key_in < 650)  return btnLEFT;
@@ -48,6 +56,7 @@ int read_LCD_buttons() {
 // see http://www.dfrobot.com/wiki/index.php/GPS/GPRS/GSM_Module_V3.0_%28SKU:TEL0051%29#How_to_drive_the_GPS_Mode_via_Arduino_board
 // for info about driving the shield
 
+// this function mathes the right row from GPS info string
 char ID() {
 
     char i = 0;
@@ -73,6 +82,7 @@ char ID() {
     }
 }
 
+// Function loops as long as th right comma is found
 void get_comma(char num) {
 
     char val;
@@ -92,6 +102,7 @@ void get_comma(char num) {
     }
 }
 
+// Gets the location latitude and saves it to lat
 void latitude(String &lat) {
 
     char i;
@@ -116,6 +127,7 @@ void latitude(String &lat) {
     }
 }
 
+// Gets the location longitude and saves it to lon
 void longitude(String &lon) {
 
     char i;
@@ -140,8 +152,11 @@ void longitude(String &lon) {
     }
 }
 
+
+// sends at commands to the shield and waits for answer
+// there can be 2 different expected answers and a timeout
 int8_t ATcommand(char* command, unsigned int timeout,
-                      char* expected_answer1, char* expected_answer2 = NULL ) {
+                 char* expected_answer1, char* expected_answer2 = NULL ) {
 
     uint8_t x=0,  answer=0;
     char response[100];
@@ -161,9 +176,11 @@ int8_t ATcommand(char* command, unsigned int timeout,
 
         if (Serial.available() != 0) {
 
+            // reading data to the array which was reserved earlier
             response[x] = Serial.read();
             x++;
 
+            // compare char arrays and return 1 or 2 if a match is found
             if (strstr(response, expected_answer1) != NULL) {
                 answer = 1;
             }
@@ -178,16 +195,18 @@ int8_t ATcommand(char* command, unsigned int timeout,
     return answer;
 }
 
+
+// Initializes GPRS functionality of the sim908
 bool initGPRS() {
 
     while (ATcommand("AT+CREG?", 2000, "+CREG: 0,1", "+CREG: 0,5") == 0);
-    
-    String command = String("AT+SAPBR=3,1,\"APN\",\""+apn+"\"")
+
+    String command = String("AT+SAPBR=3,1,\"APN\",\""+apn+"\"");
     char charBuf[command.length()+1];
     command.toCharArray(charBuf, command.length()+1);
 
     ATcommand("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\"", 2000, "OK");
-    ATcommand(charBuf, 2000, "OK");
+    ATcommand(charBuf, 2000, "OK"); // APN
 
     while (ATcommand("AT+SAPBR=1,1",  20000, "OK") == 0)
     {
@@ -256,7 +275,6 @@ void startGPS()
     ATcommand("AT", 2000, "OK");
     // turn on GPS power supply
     ATcommand("AT+CGPSPWR=1", 2000, "OK");
-
     // shut the NMEA meassages or Arduino will shut down because of flood
     ATcommand("AT+CGPSOUT=0", 2000, "OK");
     // reset GPS to cold start mode
@@ -299,6 +317,32 @@ void stopGPS()
     }
 }
 
+// this function calculates very unreliable bac value
+// you have to test and calibrate your sensor by yourself:
+// humidity and temperature affects a lot to the readings
+// and this is based partly to the amount of the drinks that have been drank
+double calculate_bac(int raw_value) {
+
+    // how much one drink affects
+    // this is the base constant which determines how much one raw number affects
+    // this could be different depending on the sex and weight of a person
+    double const one = 0.3;
+    // this multiplies is used to balance the sensor reading,
+    // they tend to change smaller amount when more drinks have been drank
+    // so this is used for compensation
+    multiplier += 0.05;
+
+    if (count == 0) {
+
+        one_drink = raw_value - start_value;
+        ++count;
+        return one;
+
+    } else {
+
+       return one / one_drink * raw_value * multiplier;
+    }
+}
 
 void setup()
 {
@@ -310,6 +354,7 @@ void setup()
     pinMode(2,OUTPUT);
     pinMode(11,OUTPUT);
     pinMode(12,OUTPUT);
+    pinMode(A1, INPUT);
 
     digitalWrite(12,HIGH);  // Output GSM Timing
     delay(1500);
@@ -340,7 +385,11 @@ void setup()
 void loop()
 {
 
+
     if (first_run == true) {
+
+        // read sensor initial value
+        start_value = analogRead(A1);
 
         lcd.clear();
         lcd.print("Use GPS: ");
@@ -417,9 +466,9 @@ void loop()
 
                 // waits for fix GPS
                 while((ATcommand("AT+CGPSSTATUS?", 5000, "Location 2D Fix", "Location 3D Fix") == 0 ) &&
-                      ((millis() - previous) < 300000));
+                      ((millis() - previous) < 10000));
 
-                if ((millis() - previous) < 300000)
+                if ((millis() - previous) < 10000)
                 {
                     fix = true;
                 }
@@ -473,7 +522,8 @@ void loop()
                 lcd.print("Measuring...");
 
                 for (int i = 0; i < 100; i++) {
-                    meas += analogRead(1);
+                    meas += analogRead(A1);
+                    delay(10);
                 }
 
                 meas = meas / 100;
@@ -482,12 +532,14 @@ void loop()
             lcd.home();
             lcd.print("Value: ");
             lcd.setCursor(8,0);
-            lcd.print(meas);
+
+            char charBuf[5];
+            String bac = String(dtostrf(calculate_bac(meas), 4, 2, charBuf));
+            lcd.print(bac);
 
             delay(2000);
 
             initGPRS();
-            String bac = String(meas);
 
             sendBACData(post_modes[post_mode], bac);
 
@@ -495,6 +547,5 @@ void loop()
             }
         }
         button = 5;
-        first_run = false;
     }
 }
