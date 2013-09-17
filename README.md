@@ -9,7 +9,7 @@ ArduBreathalyzer on Arduinoon pohjautuva alkometri, joka toimii langattomasti ne
 Veren alkoholipitoisuuden ohella alkometri välittää GPRS:n avulla erilliselle rajapinnalle myös käyttäjän sijainnin. 
 Rajapinta lähettää tiedot edelleen eteenpäin sosiaalisen median palveluihin, mikäli käyttäjä niin haluaa.
 
-Projektin taustasta sekä koodista on juttu __MikroPC 9/2013__:ssa. Koodin toinen puoli eli rajapinnan osuus löytyy reposta [ArduBreathalyzerAPI](https://github.com/skvark/ArduBreathalyzerAPI).
+Projektin taustasta sekä koodista on juttu __[MikroPC](http://www.mikropc.net/) 9/2013__:ssa. Koodin toinen puoli eli rajapinnan osuus löytyy reposta [ArduBreathalyzerAPI](https://github.com/skvark/ArduBreathalyzerAPI).
 
 Sensorin testaus ja kalibrointi
 -------------------------------
